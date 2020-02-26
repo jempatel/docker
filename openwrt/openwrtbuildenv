@@ -1,0 +1,102 @@
+#!/bin/sh
+
+cd `dirname $0`
+
+usage_help()
+{
+	echo "$0 
+	prepare <prepare docker container>
+	start <start docker container>
+	stop <stop docker container>
+	login <login to docker container>
+	backup <backup container image>
+	status <status of docker container>"
+}
+
+if [ $# -ne 1 ]; then
+	usage_help
+	exit 1
+fi
+
+ACTION=$1
+
+GIT_REPO=~/source/gitrepo/openwrt
+
+get_container_id()
+{
+	CONTAINER_ID=$(docker ps | awk '{ if ( $2 == "openwrtbuildenv" ) {print $1};}')
+	if [ x$CONTAINER_ID == x ]; then
+		echo "No instance found"
+		echo "run \"openwrtbuildenv start\""
+		exit 1
+	fi
+}
+
+prepare_container()
+{
+	docker build -t openwrtbuildenv .
+}
+
+start_container()
+{
+	docker run -d -it -v $GIT_REPO:/source openwrtbuildenv
+}
+
+login_to_container()
+{
+	get_container_id
+	docker exec -it $CONTAINER_ID "/bin/bash"
+}
+
+stop_container()
+{
+	get_container_id
+	docker stop $CONTAINER_ID
+}
+
+backup_container()
+{
+	BACKUP_IMAGE=~/openwrtbuildenv.docker
+	docker save openwrtbuildenv -o $BACKUP_IMAGE
+	echo "Container backup in $BACKUP_IMAGE"
+}
+
+container_status()
+{
+	get_container_id
+	docker exec -it $CONTAINER_ID ps -w -eaf
+}
+
+build()
+{
+	get_container_id
+	docker exec -it $CONTAINER_ID "/source/sources/build.sh"
+}
+
+case $ACTION in
+	"prepare")
+		prepare_container
+		;;
+	"start")
+		start_container
+		;;
+	"stop")
+		stop_container
+		;;
+	"login")
+		login_to_container
+		;;
+	"backup")
+		backup_container
+		;;
+	"status")
+		container_status
+		;;
+	"build")
+		build
+		;;
+	*)
+		usage_help
+		exit 1
+		;;
+esac
